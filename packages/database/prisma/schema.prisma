@@ -1,0 +1,532 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// -------------------------------------------------------------
+// IDENTITY & ACCESS CONTROL
+// -------------------------------------------------------------
+
+enum UserType {
+  CUSTOMER
+  ADMIN
+}
+
+model User {
+  id           String       @id @default(uuid())
+  email        String       @unique
+  phone        String?      @unique
+  passwordHash String?
+  firstName    String?
+  lastName     String?
+  userType     UserType     @default(CUSTOMER)
+  isVerified   Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  sessions     Session[]
+  userRoles    UserRole[]
+  addresses    Address[]
+  orders       Order[]
+  cart         Cart?
+  wishlist     WishlistItem[]
+  credits      DiscoveryCredit[]
+  auditLogs    AuditLog[]
+
+  @@index([email])
+  @@index([phone])
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  ipAddress String?
+  userAgent String?
+
+  @@index([userId])
+  @@index([token])
+}
+
+model Role {
+  id          String     @id @default(uuid())
+  name        String     @unique // e.g. OWNER, CATALOG_MANAGER, WAREHOUSE, etc.
+  description String?
+  userRoles   UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  action      String           // e.g. "product:publish", "batch:adjust", "refund:create"
+  description String?
+  roles       RolePermission[]
+
+  @@unique([action])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model Address {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipientName String
+  phone        String
+  line1        String
+  line2        String?
+  city         String
+  state        String
+  pincode      String   // 6-digit Indian postal code
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@index([pincode])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String
+  resource   String
+  resourceId String?
+  details    Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([resource, resourceId])
+}
+
+// -------------------------------------------------------------
+// CATALOG & FRAGRANCE PROFILES
+// -------------------------------------------------------------
+
+enum Concentration {
+  EXTRAIT_DE_PARFUM
+  EAU_DE_PARFUM
+  EAU_DE_TOILETTE
+  ATTAR
+  BODY_MIST
+}
+
+enum ShippingClass {
+  FLAMMABLE_SURFACE_ONLY
+  NON_FLAMMABLE_SURFACE_ONLY
+  AIR_ALLOWED
+}
+
+model Fragrance {
+  id              String         @id @default(uuid())
+  name            String
+  slug            String         @unique
+  story           String         // Warm, editorial scent description
+  perfumerNotes   String?
+  primaryFamilyId String
+  primaryFamily   FragranceFamily @relation("PrimaryFamily", fields: [primaryFamilyId], references: [id])
+  secondaryFamilyId String?
+  secondaryFamily FragranceFamily? @relation("SecondaryFamily", fields: [secondaryFamilyId], references: [id])
+  isPublished     Boolean        @default(false)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  products        Product[]
+  notes           FragranceNote[]
+  finderWeights   FinderWeight[]
+
+  @@index([slug])
+  @@index([primaryFamilyId])
+}
+
+model FragranceFamily {
+  id                 String      @id @default(uuid())
+  name               String      @unique // Floral, Woody, Amber, Fresh, Citrus, Gourmand, Earthy
+  slug               String      @unique
+  colorToken         String      // Hex color token
+  description        String
+  primaryFragrances  Fragrance[] @relation("PrimaryFamily")
+  secondaryFragrances Fragrance[] @relation("SecondaryFamily")
+}
+
+enum NoteTier {
+  TOP
+  HEART
+  BASE
+}
+
+model Note {
+  id             String          @id @default(uuid())
+  name           String          @unique // e.g. Jasmine Sambac, Mysore Sandalwood, Vetiver
+  slug           String          @unique
+  description    String?
+  fragranceNotes FragranceNote[]
+}
+
+model FragranceNote {
+  fragranceId String
+  noteId      String
+  tier        NoteTier
+  displayOrder Int            @default(0)
+  fragrance   Fragrance       @relation(fields: [fragranceId], references: [id], onDelete: Cascade)
+  note        Note            @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@id([fragranceId, noteId, tier])
+}
+
+model Product {
+  id          String           @id @default(uuid())
+  fragranceId String?
+  fragrance   Fragrance?       @relation(fields: [fragranceId], references: [id], onDelete: Cascade)
+  name        String
+  slug        String           @unique
+  description String
+  isBundle    Boolean          @default(false) // Discovery set, gift set
+  isPublished Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  variants    ProductVariant[]
+  media       ProductMedia[]
+
+  @@index([slug])
+}
+
+model ProductVariant {
+  id            String         @id @default(uuid())
+  productId     String
+  product       Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku           String         @unique
+  title         String         // e.g. "50 ml / 1.7 fl. oz."
+  volumeMl      Float
+  concentration Concentration
+  mrpPaise      Int            // MRP in minor units (paise)
+  pricePaise    Int            // Selling price in minor units (paise) <= MRP
+  weightGrams   Int
+  barcode       String?
+  shippingClass ShippingClass  @default(FLAMMABLE_SURFACE_ONLY)
+  isPublished   Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  compliance    ComplianceDeclaration?
+  batches       Batch[]
+  inventoryBalances InventoryBalance[]
+  cartItems     CartItem[]
+  orderItems    OrderItem[]
+
+  @@index([sku])
+  @@index([productId])
+}
+
+model ComplianceDeclaration {
+  id                     String         @id @default(uuid())
+  variantId              String         @unique
+  variant                ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  manufacturerName       String
+  manufacturerAddress    String
+  packerName             String
+  packerAddress          String
+  countryOfOrigin        String         @default("India")
+  consumerCareEmail      String
+  consumerCarePhone      String
+  cosmeticsLicenceNumber String
+  hsnCode                String         // 33030010 or 33030020
+  shelfLifeMonths        Int
+  ingredientsText        String         // Full statutory ingredient string
+  allergens              String[]       // IFRA allergen declarations
+  warnings               String[]       // e.g. "Flammable: Keep away from open flame"
+  version                Int            @default(1)
+  isApprovedByLegal      Boolean        @default(false)
+  updatedAt              DateTime       @updatedAt
+}
+
+model ProductMedia {
+  id          String   @id @default(uuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url         String
+  publicId    String   // Cloudinary public ID
+  altText     String
+  isPrimary   Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([productId])
+}
+
+// -------------------------------------------------------------
+// INVENTORY & BATCH MANAGEMENT (FEFO)
+// -------------------------------------------------------------
+
+enum BatchStatus {
+  AVAILABLE
+  QUARANTINED
+  EXPIRED
+  DAMAGED
+}
+
+model Warehouse {
+  id        String   @id @default(uuid())
+  name      String
+  code      String   @unique
+  pincode   String
+  city      String
+  state     String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  batches   Batch[]
+  balances  InventoryBalance[]
+}
+
+model Batch {
+  id              String      @id @default(uuid())
+  warehouseId     String
+  warehouse       Warehouse   @relation(fields: [warehouseId], references: [id])
+  variantId       String
+  variant         ProductVariant @relation(fields: [variantId], references: [id])
+  batchCode       String      // e.g. "LM-2026-B01"
+  manufactureDate DateTime
+  bestBeforeDate  DateTime
+  initialQuantity Int
+  status          BatchStatus @default(AVAILABLE)
+  createdAt       DateTime    @default(now())
+
+  balances        InventoryBalance[]
+  movements       InventoryMovement[]
+
+  @@unique([warehouseId, variantId, batchCode])
+  @@index([bestBeforeDate])
+  @@index([status])
+}
+
+model InventoryBalance {
+  id          String         @id @default(uuid())
+  warehouseId String
+  warehouse   Warehouse      @relation(fields: [warehouseId], references: [id])
+  variantId   String
+  variant     ProductVariant @relation(fields: [variantId], references: [id])
+  batchId     String
+  batch       Batch          @relation(fields: [batchId], references: [id])
+  available   Int            // Unreserved stock available for sale
+  reserved    Int            @default(0) // Stock reserved during checkout
+  committed   Int            @default(0) // Stock confirmed for packing
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([warehouseId, variantId, batchId])
+}
+
+model InventoryMovement {
+  id          String   @id @default(uuid())
+  batchId     String
+  batch       Batch    @relation(fields: [batchId], references: [id])
+  quantity    Int      // Positive (in) or negative (out)
+  reason      String   // PURCHASE, RETURN, ADJUSTMENT_DAMAGE, ADJUSTMENT_TESTER, QC_HOLD
+  referenceId String?  // Order ID, Claim ID, or Admin adjustment reference
+  createdAt   DateTime @default(now())
+
+  @@index([batchId])
+}
+
+// -------------------------------------------------------------
+// COMMERCE, CART & ORDERS
+// -------------------------------------------------------------
+
+model Cart {
+  id        String     @id @default(uuid())
+  userId    String?    @unique
+  user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  items     CartItem[]
+}
+
+model CartItem {
+  id        String         @id @default(uuid())
+  cartId    String
+  cart      Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  quantity  Int            @default(1)
+  createdAt DateTime       @default(now())
+
+  @@unique([cartId, variantId])
+}
+
+model WishlistItem {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  variantId String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, variantId])
+}
+
+model DiscoveryCredit {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amountPaise Int      // Value of credit in paise
+  orderId    String    // Originating discovery set purchase order
+  redeemedAt DateTime?
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAYMENT_CONFIRMED
+  COD_CONFIRMED
+  PROCESSING
+  PACKED
+  SHIPPED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+model Order {
+  id             String      @id @default(uuid())
+  orderNumber    String      @unique // e.g. "LM-2026-10001"
+  userId         String?
+  user           User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  status         OrderStatus @default(PENDING_PAYMENT)
+  subtotalPaise  Int
+  discountPaise  Int         @default(0)
+  taxPaise       Int         @default(0)
+  shippingPaise  Int         @default(0)
+  giftWrapPaise  Int         @default(0)
+  totalPaise     Int         // Final authoritative total in paise
+  
+  // Snapshotted fields
+  shippingClass  ShippingClass
+  giftMessage    String?
+  isGiftReceipt  Boolean     @default(false)
+  addressSnapshot Json       // Full shipping address snapshot
+  complianceSnapshot Json?   // Compliance state snapshot
+  
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  items          OrderItem[]
+  payments       PaymentTransaction[]
+
+  @@index([orderNumber])
+  @@index([userId])
+  @@index([status])
+}
+
+model OrderItem {
+  id             String         @id @default(uuid())
+  orderId        String
+  order          Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variantId      String
+  variant        ProductVariant @relation(fields: [variantId], references: [id])
+  quantity       Int
+  pricePaise     Int            // Snapshotted unit price
+  mrpPaise       Int            // Snapshotted MRP
+  batchAllocations Json?        // FEFO assigned batches and counts
+
+  @@index([orderId])
+  @@index([variantId])
+}
+
+// -------------------------------------------------------------
+// PAYMENTS & RECONCILIATION
+// -------------------------------------------------------------
+
+enum PaymentMethod {
+  RAZORPAY
+  CASH_ON_DELIVERY
+}
+
+enum PaymentStatus {
+  INITIATED
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
+}
+
+model PaymentTransaction {
+  id              String        @id @default(uuid())
+  orderId         String
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  method          PaymentMethod
+  status          PaymentStatus @default(INITIATED)
+  amountPaise     Int
+  providerOrderId String?       // Razorpay order_id
+  providerPaymentId String?     // Razorpay payment_id
+  signature       String?
+  rawWebhookPayload Json?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([orderId])
+  @@index([providerOrderId])
+}
+
+// -------------------------------------------------------------
+// FRAGRANCE FINDER
+// -------------------------------------------------------------
+
+model FinderQuestion {
+  id          String         @id @default(uuid())
+  step        Int            @unique
+  prompt      String
+  description String?
+  answers     FinderAnswer[]
+}
+
+model FinderAnswer {
+  id          String         @id @default(uuid())
+  questionId  String
+  question    FinderQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  label       String
+  description String?
+  weights     FinderWeight[]
+}
+
+model FinderWeight {
+  answerId    String
+  fragranceId String
+  weight      Int            // Weight modifier for recommendation
+  answer      FinderAnswer   @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  fragrance   Fragrance      @relation(fields: [fragranceId], references: [id], onDelete: Cascade)
+
+  @@id([answerId, fragranceId])
+}
+

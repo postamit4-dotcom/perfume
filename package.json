@@ -1,0 +1,30 @@
+{
+  "name": "lamaia-commerce",
+  "version": "0.1.0",
+  "private": true,
+  "description": "La Maia — single-brand, India-first perfume e-commerce platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md}\"",
+    "clean": "turbo run clean && rimraf node_modules"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "turbo": "^2.1.3",
+    "typescript": "^5.5.4"
+  },
+  "packageManager": "pnpm@12.16.1",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
+
