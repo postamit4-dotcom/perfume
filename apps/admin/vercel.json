@@ -4,3 +4,4 @@
   "buildCommand": "cd ../.. && pnpm turbo run build --filter=@lamaia/admin...",
   "outputDirectory": ".next"
 }
+

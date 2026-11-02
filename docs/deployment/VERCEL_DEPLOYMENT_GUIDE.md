@@ -60,3 +60,4 @@ To deploy the administrative application as a separate project on Vercel:
 - **Root Directory:** `apps/admin`
 - **Build Command:** `cd ../.. && pnpm turbo run build --filter=@lamaia/admin...`
 - **Output Directory:** `.next`
+
