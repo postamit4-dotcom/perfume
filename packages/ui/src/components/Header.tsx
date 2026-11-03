@@ -557,7 +557,7 @@ export const Header: React.FC<HeaderProps> = ({
                 By Character &amp; Gender
               </span>
               <ul className="space-y-2 text-ink">
-                <li><a href="/fragrances?audience=men" className="hover:text-accent transition-colors block">Men&rsquo;s Perfumes (Bold &amp; Smoky)</a></li>
+                <li><a href="/mens-perfume" className="hover:text-accent transition-colors block font-medium">Men&rsquo;s Perfumes (From ₹499)</a></li>
                 <li><a href="/fragrances?audience=women" className="hover:text-accent transition-colors block">Women&rsquo;s Perfumes (Floral Sillage)</a></li>
                 <li><a href="/fragrances?audience=unisex" className="hover:text-accent transition-colors block">Unisex &amp; Layering Resins</a></li>
                 <li><a href="/fragrances?occasion=office" className="hover:text-accent transition-colors block">Daily Commuter &amp; Office Wear</a></li>
@@ -887,7 +887,7 @@ export const Header: React.FC<HeaderProps> = ({
                   {mobileAccordions.perfumes && (
                     <div className="p-3 bg-surface-raised space-y-2.5">
                       <div className="font-semibold text-accent text-[11px] uppercase tracking-wider">By Gender</div>
-                      <a href="/fragrances?audience=men" onClick={() => setMobileDrawerOpen(false)} className="block text-ink hover:text-accent pl-2">Men&rsquo;s Fragrances</a>
+                      <a href="/mens-perfume" onClick={() => setMobileDrawerOpen(false)} className="block text-ink hover:text-accent pl-2 font-medium">Men&rsquo;s Perfumes (From ₹499)</a>
                       <a href="/fragrances?audience=women" onClick={() => setMobileDrawerOpen(false)} className="block text-ink hover:text-accent pl-2">Women&rsquo;s Fragrances</a>
                       <a href="/fragrances?audience=unisex" onClick={() => setMobileDrawerOpen(false)} className="block text-ink hover:text-accent pl-2">Unisex &amp; Layering</a>
 
